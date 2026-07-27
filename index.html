@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SMT工单计算</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: "Microsoft YaHei", "微软雅黑", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #fff;
+  color: #1d1d1f;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+input { font-family: inherit; }
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ── Header ── */
+.app-header {
+  background: #fff;
+  padding: 19px 20px 0;
+}
+.header-row {
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+.header-left h1 {
+  font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+  color: #1d1d1f; line-height: 1.2;
+}
+.current-time {
+  display: block; font-size: 12px; color: #86868b; font-weight: 500;
+  margin-top: 2px; letter-spacing: 0.5px; font-variant-numeric: tabular-nums;
+}
+.add-btn {
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: #007aff; color: #fff; font-size: 20px; font-weight: 400;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; line-height: 1;
+  transition: transform 0.15s, opacity 0.15s;
+}
+.add-btn:active { transform: scale(0.92); opacity: 0.85; }
+
+/* ── Timeline ── */
+.timeline-wrap {
+  margin-top: 15px; padding-bottom: 6px;
+}
+.timeline-wrap:empty { display: none; }
+.timeline-scroll {
+  display: flex; gap: 36px; overflow-x: auto; padding: 4px 8px 8px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  align-items: flex-end;
+}
+.timeline-scroll::-webkit-scrollbar { display: none; }
+.timeline-item {
+  display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+  min-width: 52px; cursor: pointer; position: relative;
+}
+.timeline-time {
+  font-size: 10px; color: #86868b; font-weight: 600; margin-bottom: 5px;
+  white-space: nowrap; letter-spacing: 0.2px; font-variant-numeric: tabular-nums;
+}
+.timeline-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #007aff;
+  box-shadow: 0 0 0 2px #fff, 0 1px 2px rgba(0,122,255,0.2);
+  transition: transform 0.15s;
+}
+.timeline-item:active .timeline-dot { transform: scale(1.3); }
+.timeline-name {
+  font-size: 10px; color: #1d1d1f; font-weight: 500; margin-top: 5px;
+  white-space: nowrap; max-width: 56px; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Cards Container ── */
+.cards-container {
+  padding: 16px 16px 40px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+/* ── Card ── */
+.card {
+  background: #fff; border-radius: 16px; border: 1px solid #efeff1;
+  padding: 16px 18px 14px;
+}
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.name-input {
+  font-size: 16px; font-weight: 600; color: #1d1d1f; border: none;
+  background: transparent; padding: 4px 8px; margin: -4px -8px; border-radius: 8px;
+  width: 140px; outline: none; transition: background 0.15s;
+  text-overflow: ellipsis;
+}
+.name-input:hover { background: #f2f2f7; }
+.name-input:focus { background: #f2f2f7; }
+.delete-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  background: transparent; color: #ff3b30; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.delete-btn:hover { background: rgba(255,59,48,0.08); }
+.delete-btn:active { background: rgba(255,59,48,0.15); }
+
+/* ── Inputs Row ── */
+.inputs-row {
+  display: flex; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 12px;
+}
+.input-group {
+  flex: 1 1 calc(50% - 5px); min-width: 0;
+}
+.input-group label {
+  display: block; font-size: 11px; color: #86868b; font-weight: 500;
+  margin-bottom: 4px; white-space: nowrap;
+}
+.input-group input {
+  width: 100%; height: 40px; border: none; border-radius: 8px;
+  background: #f2f2f7; font-size: 16px; color: #636366;
+  padding: 0 8px; outline: none; text-align: center;
+  caret-color: #636366;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.input-group input:focus {
+  background: #f2f2f7;
+}
+.input-group input::placeholder { color: #c7c7cc; }
+
+/* ── Results Row ── */
+.results-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #f9f9fb; border-radius: 10px; padding: 10px 14px;
+  margin-bottom: 12px; min-height: 40px;
+}
+.result-item {
+  display: flex; flex-direction: column-reverse; align-items: center; flex: 1;
+  min-width: 0; gap: 2px;
+}
+.result-label {
+  font-size: 10px; color: #86868b; font-weight: 500; white-space: nowrap;
+}
+.result-value {
+  font-size: 13px; color: #1d1d1f; font-weight: 400; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.result-value.empty { color: #c7c7cc; font-weight: 400; }
+.result-divider {
+  width: 0.5px; height: 28px; background: #e5e5ea; flex-shrink: 0;
+}
+
+/* ── Clear Button ── */
+.clear-btn {
+  width: 100%; height: 38px; border: 1px solid #efeff1; border-radius: 10px;
+  background: #fff; color: #636366; font-size: 13px; font-weight: 500;
+  cursor: pointer;
+}
+.clear-btn:hover { }
+.clear-btn:active { }
+
+/* ── Empty State ── */
+.empty-state {
+  text-align: center; padding: 60px 20px; color: #86868b;
+}
+.empty-state p { font-size: 14px; line-height: 1.6; }
+.empty-state .emoji { font-size: 40px; display: block; margin-bottom: 12px; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-card {
+  background: #fff; border-radius: 16px; width: 280px; max-width: 90vw;
+  padding: 24px 20px 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  text-align: center; transform: translateY(8px);
+  transition: transform 0.25s cubic-bezier(0.2,0.8,0.4,1);
+}
+.modal-overlay.active .modal-card { transform: translateY(0); }
+.modal-title { font-size: 16px; font-weight: 600; color: #1d1d1f; margin-bottom: 6px; }
+.modal-msg { font-size: 13px; color: #86868b; margin-bottom: 20px; line-height: 1.4; }
+.modal-buttons { display: flex; gap: 10px; }
+.modal-buttons button {
+  flex: 1; height: 42px; border-radius: 10px; border: none;
+  font-size: 15px; font-weight: 500; cursor: pointer; transition: background 0.15s;
+}
+.modal-cancel { background: #f2f2f7; color: #1d1d1f; }
+.modal-cancel:hover { background: #e5e5ea; }
+.modal-confirm { background: #ff3b30; color: #fff; }
+.modal-confirm:hover { background: #e0352c; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-row">
+    <div class="header-left">
+      <h1>SMT工单计算</h1>
+      <span class="current-time" id="clock">----</span>
+    </div>
+    <button class="add-btn" id="addBtn" title="添加产线">+</button>
+  </div>
+  <div class="timeline-wrap" id="timelineWrap">
+    <div class="timeline-scroll" id="timeline"></div>
+  </div>
+</header>
+
+<main class="cards-container" id="cardsContainer"></main>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-card">
+    <div class="modal-title">删除产线</div>
+    <div class="modal-msg" id="modalMsg">确定要删除此产线吗？此操作不可撤销。</div>
+    <div class="modal-buttons">
+      <button class="modal-cancel" id="modalCancel">取消</button>
+      <button class="modal-confirm" id="modalConfirm">删除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+const STORAGE_KEY = 'smt_calc_lines';
+const DEFAULT_COUNT = 8;
+const el = {
+  clock: document.getElementById('clock'),
+  timeline: document.getElementById('timeline'),
+  timelineWrap: document.getElementById('timelineWrap'),
+  cards: document.getElementById('cardsContainer'),
+  modal: document.getElementById('modalOverlay'),
+  modalMsg: document.getElementById('modalMsg'),
+  addBtn: document.getElementById('addBtn'),
+};
+
+let lines = [];
+let deleteTargetId = null;
+let clockTimer = null;
+
+// ─── Helpers ───
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function fmtClock(d) {
+  return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function fmtCompletion(d) {
+  return pad(d.getMonth()+1) + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function hasCompleteData(line) {
+  return line.targetQty > 0 && line.timePerBoard > 0 && line.panelsPerBoard > 0;
+}
+
+// ─── Calculation ───
+function calculateLine(line) {
+  if (!hasCompleteData(line)) return null;
+  const remaining = line.targetQty - line.currentQty;
+  if (remaining <= 0) return { hourlyCapacity: '--', remainingHours: '已完成', completionTime: '--', completionTimestamp: 0 };
+  const totalHours = (remaining * line.timePerBoard) / 3600 / line.panelsPerBoard;
+  const now = new Date();
+  const compDate = new Date(now.getTime() + totalHours * 3600 * 1000);
+  const hourlyCapacity = Math.round(3600 * line.panelsPerBoard / line.timePerBoard);
+  const remH = Math.floor(totalHours);
+  const remM = Math.round((totalHours - remH) * 60);
+  const remDisplay = remH > 0 ? remH + 'H ' + remM + 'm' : remM + 'm';
+  return {
+    hourlyCapacity: String(hourlyCapacity),
+    remainingHours: remDisplay,
+    completionTime: fmtCompletion(compDate),
+    completionTimestamp: compDate.getTime(),
+  };
+}
+
+// ─── Storage ───
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) lines = JSON.parse(raw);
+  } catch(e) { lines = []; }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(lines));
+}
+
+// ─── Line Operations ───
+function createLine(name) {
+  return {
+    id: uid(),
+    name: name,
+    targetQty: '',
+    currentQty: '',
+    timePerBoard: '',
+    panelsPerBoard: '',
+    completionTime: '',
+    completionTimestamp: 0,
+  };
+}
+
+function createDefaultLines() {
+  lines = [];
+  for (let i = 1; i <= DEFAULT_COUNT; i++) {
+    lines.push(createLine('SMT' + i));
+  }
+  saveState();
+}
+
+function addLine() {
+  const num = lines.length + 1;
+  lines.push(createLine('SMT' + num));
+  saveState();
+  renderAll();
+  // scroll to bottom
+  setTimeout(() => {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }, 100);
+}
+
+function confirmDelete() {
+  if (!deleteTargetId) return;
+  lines = lines.filter(l => l.id !== deleteTargetId);
+  deleteTargetId = null;
+  saveState();
+  closeModal();
+  renderAll();
+}
+
+function updateField(id, field, value) {
+  const line = lines.find(l => l.id === id);
+  if (!line) return;
+  // parse numeric fields
+  if (field !== 'name') {
+    const num = value === '' ? '' : parseFloat(value);
+    line[field] = isNaN(num) ? '' : num;
+  } else {
+    line.name = value;
+  }
+  // recalculate completion time
+  const result = calculateLine(line);
+  if (result) {
+    line.completionTime = result.completionTime;
+    line.completionTimestamp = result.completionTimestamp;
+  } else {
+    line.completionTime = '';
+    line.completionTimestamp = 0;
+  }
+  saveState();
+  updateLineResults(line);
+  renderTimeline();
+}
+
+function clearLine(id) {
+  const line = lines.find(l => l.id === id);
+  if (!line) return;
+  line.targetQty = '';
+  line.currentQty = '';
+  line.timePerBoard = '';
+  line.panelsPerBoard = '';
+  line.completionTime = '';
+  line.completionTimestamp = 0;
+  saveState();
+  renderAll();
+}
+
+// ─── Modal ───
+function openModal(id, name) {
+  deleteTargetId = id;
+  el.modalMsg.textContent = '确定要删除 ' + (name || '此产线') + ' 吗？此操作不可撤销。';
+  el.modal.classList.add('active');
+}
+
+function closeModal() {
+  deleteTargetId = null;
+  el.modal.classList.remove('active');
+}
+
+// ─── Rendering ───
+function updateClock() {
+  el.clock.textContent = fmtClock(new Date());
+}
+
+function renderTimeline() {
+  const items = lines
+    .filter(l => l.completionTime && l.completionTimestamp > 0)
+    .sort((a, b) => a.completionTimestamp - b.completionTimestamp);
+
+  if (items.length === 0) {
+    el.timeline.innerHTML = '';
+    el.timelineWrap.style.display = 'none';
+    document.querySelector('.app-header').style.paddingBottom = '16px';
+    return;
+  }
+  document.querySelector('.app-header').style.paddingBottom = '0';
+  el.timelineWrap.style.display = '';
+  el.timeline.innerHTML = items.map(l => {
+    // Show only time part for brevity in timeline
+    const timeParts = l.completionTime.split(' ');
+    const timeStr = timeParts.length > 1 ? timeParts[1] : l.completionTime;
+    return `<div class="timeline-item" data-line-id="${l.id}">
+      <span class="timeline-time">${l.completionTime}</span>
+      <div class="timeline-dot"></div>
+      <span class="timeline-name">${escHtml(l.name)}</span>
+    </div>`;
+  }).join('');
+}
+
+function updateLineResults(line) {
+  const card = document.querySelector(`.card[data-line-id="${line.id}"]`);
+  if (!card) return;
+  const result = calculateLine(line);
+  const capEl = card.querySelector('.result-capacity');
+  const remEl = card.querySelector('.result-remaining');
+  const compEl = card.querySelector('.result-completion');
+  if (result) {
+    capEl.textContent = result.hourlyCapacity; capEl.classList.remove('empty');
+    remEl.textContent = result.remainingHours; remEl.classList.remove('empty');
+    compEl.textContent = result.completionTime; compEl.classList.remove('empty');
+  } else {
+    capEl.textContent = '--'; capEl.classList.add('empty');
+    remEl.textContent = '--'; remEl.classList.add('empty');
+    compEl.textContent = '--'; compEl.classList.add('empty');
+  }
+}
+
+function renderCards() {
+  el.cards.innerHTML = lines.length === 0
+    ? `<div class="empty-state"><span class="emoji">📋</span><p>暂无产线<br>点击右上角 + 添加</p></div>`
+    : lines.map(renderLineCard).join('');
+}
+
+function renderLineCard(line) {
+  const result = calculateLine(line);
+  const cap = result ? result.hourlyCapacity : '--';
+  const rem = result ? result.remainingHours : '--';
+  const comp = line.completionTime || '--';
+  const capClass = result ? '' : 'empty';
+  const remClass = result ? '' : 'empty';
+  const compClass = line.completionTime ? '' : 'empty';
+
+  return `<div class="card" data-line-id="${line.id}">
+    <div class="card-header">
+      <input class="name-input" data-line-id="${line.id}" data-field="name"
+        value="${escAttr(line.name)}" maxlength="20" autocomplete="off" spellcheck="false">
+      <button class="delete-btn" data-line-id="${line.id}" data-action="delete" title="删除产线">✕</button>
+    </div>
+    <div class="inputs-row">
+      <div class="input-group">
+        <label>目标产量</label>
+        <input type="number" data-line-id="${line.id}" data-field="targetQty"
+          value="${line.targetQty !== '' ? line.targetQty : ''}" placeholder="0" min="0" step="1" inputmode="numeric">
+      </div>
+      <div class="input-group">
+        <label>当前产量</label>
+        <input type="number" data-line-id="${line.id}" data-field="currentQty"
+          value="${line.currentQty !== '' ? line.currentQty : ''}" placeholder="0" min="0" step="1" inputmode="numeric">
+      </div>
+      <div class="input-group">
+        <label>耗时(秒/块)</label>
+        <input type="number" data-line-id="${line.id}" data-field="timePerBoard"
+          value="${line.timePerBoard !== '' ? line.timePerBoard : ''}" placeholder="0" min="0" step="0.1" inputmode="decimal">
+      </div>
+      <div class="input-group">
+        <label>拼版数</label>
+        <input type="number" data-line-id="${line.id}" data-field="panelsPerBoard"
+          value="${line.panelsPerBoard !== '' ? line.panelsPerBoard : ''}" placeholder="0" min="0" step="1" inputmode="numeric">
+      </div>
+    </div>
+    <div class="results-row">
+      <div class="result-item">
+        <span class="result-label">每小时产量</span>
+        <span class="result-value result-capacity ${capClass}">${cap}</span>
+      </div>
+      <div class="result-divider"></div>
+      <div class="result-item">
+        <span class="result-label">剩余耗时</span>
+        <span class="result-value result-remaining ${remClass}">${rem}</span>
+      </div>
+      <div class="result-divider"></div>
+      <div class="result-item">
+        <span class="result-label">完成时间</span>
+        <span class="result-value result-completion ${compClass}">${comp}</span>
+      </div>
+    </div>
+    <button class="clear-btn" data-line-id="${line.id}" data-action="clear">清除数据</button>
+  </div>`;
+}
+
+function escHtml(s) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return String(s).replace(/[&<>"']/g, c => map[c]);
+}
+
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderAll() {
+  renderCards();
+  renderTimeline();
+  updateClock();
+}
+
+// ─── Event Delegation ───
+document.addEventListener('input', function(e) {
+  const input = e.target.closest('[data-line-id][data-field]');
+  if (!input) return;
+  const id = input.dataset.lineId;
+  const field = input.dataset.field;
+  const value = input.value;
+  updateField(id, field, value);
+});
+
+document.addEventListener('click', function(e) {
+  // Delete button
+  const delBtn = e.target.closest('[data-action="delete"]');
+  if (delBtn) {
+    const id = delBtn.dataset.lineId;
+    const line = lines.find(l => l.id === id);
+    openModal(id, line ? line.name : '');
+    return;
+  }
+  // Clear button
+  const clearBtn = e.target.closest('[data-action="clear"]');
+  if (clearBtn) {
+    clearLine(clearBtn.dataset.lineId);
+    return;
+  }
+  // Timeline item click - scroll to card
+  const tItem = e.target.closest('.timeline-item');
+  if (tItem) {
+    const id = tItem.dataset.lineId;
+    const card = document.querySelector(`.card[data-line-id="${id}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.style.transition = 'box-shadow 0.3s';
+      card.style.boxShadow = '0 0 0 3px rgba(0,122,255,0.25), 0 2px 8px rgba(0,0,0,0.08)';
+      setTimeout(() => { card.style.boxShadow = ''; card.style.transition = ''; }, 800);
+    }
+  }
+});
+
+// Add button
+el.addBtn.addEventListener('click', addLine);
+
+// Modal buttons
+document.getElementById('modalCancel').addEventListener('click', closeModal);
+document.getElementById('modalConfirm').addEventListener('click', confirmDelete);
+el.modal.addEventListener('click', function(e) {
+  if (e.target === el.modal) closeModal();
+});
+
+// Close modal on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && el.modal.classList.contains('active')) closeModal();
+});
+
+// ─── Init ───
+function init() {
+  loadState();
+  if (lines.length === 0) createDefaultLines();
+  renderAll();
+  clockTimer = setInterval(updateClock, 10000);
+}
+
+init();
+
+})();
+</script>
+</body>
+</html>
